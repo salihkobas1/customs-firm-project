@@ -9,7 +9,7 @@ const slides = [
       'Fark Yaratan, Fayda',
       'Sağlayan Yaklaşım'
     ],
-    image: '/slider1.jpg'
+    image: '/Slider1.jpg'
   },
   {
     titleLines: [
@@ -17,7 +17,7 @@ const slides = [
       'Süreçlerinde',
       'Güvenli Danışmanlık'
     ],
-    image: '/slider2.jpg'
+    image: '/Slider2.jpg'
   }
 ];
 
