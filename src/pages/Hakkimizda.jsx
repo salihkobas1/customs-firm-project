@@ -4,7 +4,7 @@ import { Container, Typography, Grid, Paper, Box } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import FlagIcon from '@mui/icons-material/Flag';
 import GroupsIcon from '@mui/icons-material/Groups';
-
+import CurrencyConverter from "../components/CurrencyConverter";
 
 export default function Hakkimizda() {
   return (
