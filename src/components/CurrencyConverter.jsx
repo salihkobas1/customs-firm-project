@@ -1,117 +1,238 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Card, CardContent, Typography, Box,
-  TextField, FormControl, InputLabel, Select, MenuItem,
-  IconButton, Divider, CircularProgress
+  Alert,
+  Box,
+  Card,
+  CardContent,
+  CircularProgress,
+  Typography,
 } from "@mui/material";
-import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
+import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
+import EuroIcon from "@mui/icons-material/Euro";
+import DiamondIcon from "@mui/icons-material/Diamond";
+import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 
-const CURRENCIES = ["TRY", "USD", "EUR", "GBP", "CHF", "JPY", "AUD", "CAD"];
+const MARKET_ITEMS = [
+  {
+    key: "USD",
+    label: "USD/TL",
+    icon: AttachMoneyIcon,
+    accent: "#1f7a5c",
+  },
+  {
+    key: "EUR",
+    label: "EUR/TL",
+    icon: EuroIcon,
+    accent: "#2458a6",
+  },
+  {
+    key: "GOLD",
+    label: "Gram Altın",
+    icon: DiamondIcon,
+    accent: "#c6922d",
+  },
+];
+
+function parseTurkishNumber(value) {
+  if (!value) return null;
+  const cleaned = String(value)
+    .replace(/[^\d,.-]/g, "")
+    .replace(/\./g, "")
+    .replace(",", ".");
+  const parsed = Number.parseFloat(cleaned);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+async function fetchFallbackCurrency(from) {
+  const res = await fetch(`https://api.frankfurter.app/latest?from=${from}&to=TRY`);
+  if (!res.ok) throw new Error(`Fallback ${from} request failed`);
+  const data = await res.json();
+  return data?.rates?.TRY || null;
+}
 
 export default function CurrencyConverter() {
-  const [amount, setAmount] = useState(100);
-  const [from, setFrom] = useState("USD");
-  const [to, setTo] = useState("TRY");
-  const [rates, setRates] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [market, setMarket] = useState({});
   const [updatedAt, setUpdatedAt] = useState("");
-
-  const result = useMemo(() => {
-    if (!rates || !rates[to]) return "";
-    const val = Number(amount || 0) * rates[to];
-    return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(val);
-  }, [amount, rates, to]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    async function fetchRates() {
+
+    async function fetchMarket() {
       setLoading(true);
+      setError(false);
+
       try {
-        // Ücretsiz & anahtarsız: exchangerate.host
-        const res = await fetch(`https://api.exchangerate.host/latest?base=${from}`);
+        const res = await fetch("https://finans.truncgil.com/today.json");
+        if (!res.ok) throw new Error("Market feed request failed");
+
         const data = await res.json();
-        if (!cancelled) {
-          setRates(data.rates || {});
-          setUpdatedAt(data.date || "");
+        if (cancelled) return;
+
+        setMarket({
+          USD: parseTurkishNumber(data?.USD?.Alış || data?.USD?.["Alış"]),
+          EUR: parseTurkishNumber(data?.EUR?.Alış || data?.EUR?.["Alış"]),
+          GOLD: parseTurkishNumber(
+            data?.["Gram Altın"]?.Alış ||
+              data?.["gram-altin"]?.Alış ||
+              data?.["Gram Altın"]?.["Alış"]
+          ),
+        });
+        setUpdatedAt(
+          new Date().toLocaleTimeString("tr-TR", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        );
+      } catch (primaryError) {
+        try {
+          const [usd, eur] = await Promise.all([
+            fetchFallbackCurrency("USD"),
+            fetchFallbackCurrency("EUR"),
+          ]);
+          if (cancelled) return;
+
+          setMarket({ USD: usd, EUR: eur, GOLD: null });
+          setUpdatedAt(
+            new Date().toLocaleTimeString("tr-TR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          );
+          setError(true);
+        } catch (fallbackError) {
+          if (!cancelled) {
+            setMarket({});
+            setError(true);
+          }
         }
-      } catch (e) {
-        if (!cancelled) setRates(null);
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
-    fetchRates();
-    return () => { cancelled = true; };
-  }, [from]);
 
-  const swap = () => {
-    setFrom(to);
-    setTo(from);
-  };
+    fetchMarket();
+    const intervalId = window.setInterval(fetchMarket, 60000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  const formatter = useMemo(
+    () =>
+      new Intl.NumberFormat("tr-TR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+    []
+  );
 
   return (
     <Card
-      elevation={4}
+      elevation={0}
       sx={{
-        borderRadius: 2,
-        position: "sticky",
-        top: 96, // navbar + nefes payı
+        borderRadius: 3,
+        overflow: "hidden",
+        border: "1px solid rgba(255,255,255,0.65)",
+        bgcolor: "rgba(255,255,255,0.92)",
+        backdropFilter: "blur(18px)",
+        boxShadow: "0 24px 70px rgba(16, 34, 53, 0.16)",
       }}
     >
-      <CardContent>
-        <Typography variant="h6" fontWeight={700} gutterBottom>
-          Döviz Çevirici
-        </Typography>
-
-        <Box sx={{ display: "grid", gridTemplateColumns: "1fr", gap: 2 }}>
-          <TextField
-            label="Tutar"
-            type="number"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            fullWidth
-            size="small"
-          />
-
-          <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Kaynak</InputLabel>
-              <Select label="Kaynak" value={from} onChange={(e) => setFrom(e.target.value)}>
-                {CURRENCIES.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-              </Select>
-            </FormControl>
-
-            <IconButton onClick={swap} aria-label="swap" sx={{ mx: 0.5 }}>
-              <SwapHorizIcon />
-            </IconButton>
-
-            <FormControl fullWidth size="small">
-              <InputLabel>Hedef</InputLabel>
-              <Select label="Hedef" value={to} onChange={(e) => setTo(e.target.value)}>
-                {CURRENCIES.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-              </Select>
-            </FormControl>
-          </Box>
-
-          <Divider />
-
-          <Box sx={{ minHeight: 56, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <Typography color="text.secondary">Sonuç</Typography>
-            {loading ? (
-              <CircularProgress size={22} />
-            ) : (
-              <Typography variant="h6" fontWeight={700}>
-                {result ? `${result} ${to}` : "-"}
-              </Typography>
-            )}
-          </Box>
-
-          {updatedAt && (
-            <Typography variant="caption" color="text.secondary">
-              Güncellenme: {updatedAt}
+      <CardContent sx={{ p: { xs: 2.5, md: 3 } }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: { xs: "flex-start", md: "center" },
+            justifyContent: "space-between",
+            flexDirection: { xs: "column", md: "row" },
+            gap: 1.5,
+            mb: 2.5,
+          }}
+        >
+          <Box>
+            <Typography
+              variant="overline"
+              sx={{ color: "#c6922d", fontWeight: 900, letterSpacing: 1 }}
+            >
+              Canlı Piyasa
             </Typography>
-          )}
+            <Typography variant="h6" sx={{ fontWeight: 900, color: "#102235" }}>
+              Kur ve altın bilgileri
+            </Typography>
+          </Box>
+
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: "#5d6b7a" }}>
+            {loading ? <CircularProgress size={18} /> : <TrendingUpIcon fontSize="small" />}
+            <Typography variant="body2">
+              {updatedAt ? `Son güncelleme ${updatedAt}` : "Veriler yükleniyor"}
+            </Typography>
+          </Box>
         </Box>
+
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", sm: "repeat(3, minmax(0, 1fr))" },
+            gap: 1.5,
+          }}
+        >
+          {MARKET_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const value = market[item.key];
+
+            return (
+              <Card
+                key={item.key}
+                elevation={0}
+                sx={{
+                  borderRadius: 2,
+                  border: "1px solid rgba(16, 34, 53, 0.1)",
+                  boxShadow: "none",
+                  bgcolor: "#f8fafc",
+                }}
+              >
+                <CardContent sx={{ p: 2 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, mb: 1.5 }}>
+                    <Box
+                      sx={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 2,
+                        display: "grid",
+                        placeItems: "center",
+                        color: item.accent,
+                        bgcolor: `${item.accent}18`,
+                      }}
+                    >
+                      <Icon />
+                    </Box>
+                    <Typography sx={{ fontWeight: 900, color: "#102235" }}>
+                      {item.label}
+                    </Typography>
+                  </Box>
+
+                  <Typography variant="h5" sx={{ fontWeight: 900, color: "#102235" }}>
+                    {loading
+                      ? "..."
+                      : Number.isFinite(value)
+                        ? `${formatter.format(value)} TL`
+                        : "Veri yok"}
+                  </Typography>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </Box>
+
+        {error && (
+          <Alert severity="info" sx={{ mt: 2, borderRadius: 2 }}>
+            Ana piyasa kaynağına ulaşılamazsa USD ve EUR yedek kaynaktan alınır;
+            altın verisi kaynak erişimine bağlıdır.
+          </Alert>
+        )}
       </CardContent>
     </Card>
   );
