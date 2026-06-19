@@ -75,7 +75,7 @@ async function fetchFallbackCurrency(from) {
 export default function CurrencyConverter() {
   const [isVisible, setIsVisible] = useState(true);
   const [market, setMarket] = useState({});
-  const [updatedAt, setUpdatedAt] = useState("");
+  const [, setUpdatedAt] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
