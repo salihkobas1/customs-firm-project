@@ -5,11 +5,13 @@ import {
   Card,
   CardContent,
   CircularProgress,
+  IconButton,
   Typography,
 } from "@mui/material";
 import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
+import CloseIcon from "@mui/icons-material/Close";
 import EuroIcon from "@mui/icons-material/Euro";
-import DiamondIcon from "@mui/icons-material/Diamond";
+import CurrencyPoundIcon from "@mui/icons-material/CurrencyPound";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 
 const MARKET_ITEMS = [
@@ -21,15 +23,15 @@ const MARKET_ITEMS = [
   },
   {
     key: "EUR",
-    label: "EUR/TL",
+    label: "EURO/TL",
     icon: EuroIcon,
     accent: "#2458a6",
   },
   {
-    key: "GOLD",
-    label: "Gram Altın",
-    icon: DiamondIcon,
-    accent: "#c6922d",
+    key: "GBP",
+    label: "GBP/TL",
+    icon: CurrencyPoundIcon,
+    accent: "#7f3f98",
   },
 ];
 
@@ -43,6 +45,26 @@ function parseTurkishNumber(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function readRate(data, currency) {
+  const entry = data?.[currency];
+  if (!entry || typeof entry !== "object") return null;
+
+  const directValue =
+    entry["Alis"] ||
+    entry["Alış"] ||
+    entry["AlÄ±ÅŸ"] ||
+    entry["alis"] ||
+    entry["Satış"] ||
+    entry["Satis"];
+
+  if (directValue) return parseTurkishNumber(directValue);
+
+  const firstNumericValue = Object.values(entry).find((value) =>
+    Number.isFinite(parseTurkishNumber(value))
+  );
+  return parseTurkishNumber(firstNumericValue);
+}
+
 async function fetchFallbackCurrency(from) {
   const res = await fetch(`https://api.frankfurter.app/latest?from=${from}&to=TRY`);
   if (!res.ok) throw new Error(`Fallback ${from} request failed`);
@@ -51,6 +73,7 @@ async function fetchFallbackCurrency(from) {
 }
 
 export default function CurrencyConverter() {
+  const [isVisible, setIsVisible] = useState(true);
   const [market, setMarket] = useState({});
   const [updatedAt, setUpdatedAt] = useState("");
   const [loading, setLoading] = useState(true);
@@ -71,13 +94,9 @@ export default function CurrencyConverter() {
         if (cancelled) return;
 
         setMarket({
-          USD: parseTurkishNumber(data?.USD?.Alış || data?.USD?.["Alış"]),
-          EUR: parseTurkishNumber(data?.EUR?.Alış || data?.EUR?.["Alış"]),
-          GOLD: parseTurkishNumber(
-            data?.["Gram Altın"]?.Alış ||
-              data?.["gram-altin"]?.Alış ||
-              data?.["Gram Altın"]?.["Alış"]
-          ),
+          USD: readRate(data, "USD"),
+          EUR: readRate(data, "EUR"),
+          GBP: readRate(data, "GBP"),
         });
         setUpdatedAt(
           new Date().toLocaleTimeString("tr-TR", {
@@ -87,13 +106,14 @@ export default function CurrencyConverter() {
         );
       } catch (primaryError) {
         try {
-          const [usd, eur] = await Promise.all([
+          const [usd, eur, gbp] = await Promise.all([
             fetchFallbackCurrency("USD"),
             fetchFallbackCurrency("EUR"),
+            fetchFallbackCurrency("GBP"),
           ]);
           if (cancelled) return;
 
-          setMarket({ USD: usd, EUR: eur, GOLD: null });
+          setMarket({ USD: usd, EUR: eur, GBP: gbp });
           setUpdatedAt(
             new Date().toLocaleTimeString("tr-TR", {
               hour: "2-digit",
@@ -129,27 +149,52 @@ export default function CurrencyConverter() {
     []
   );
 
+  if (!isVisible) return null;
+
   return (
     <Card
       elevation={0}
       sx={{
-        borderRadius: 3,
+        position: "fixed",
+        top: { xs: 84, md: 96 },
+        right: { xs: 12, md: 24 },
+        zIndex: (theme) => theme.zIndex.drawer + 2,
+        width: { xs: "calc(100vw - 24px)", sm: 360, md: 390 },
+        maxWidth: 390,
+        borderRadius: 2,
         overflow: "hidden",
         border: "1px solid rgba(255,255,255,0.65)",
         bgcolor: "rgba(255,255,255,0.92)",
         backdropFilter: "blur(18px)",
-        boxShadow: "0 24px 70px rgba(16, 34, 53, 0.16)",
+        boxShadow: "0 24px 70px rgba(16, 34, 53, 0.2)",
       }}
     >
-      <CardContent sx={{ p: { xs: 2.5, md: 3 } }}>
+      <IconButton
+        aria-label="Döviz panelini kapat"
+        onClick={() => setIsVisible(false)}
+        size="small"
+        sx={{
+          position: "absolute",
+          top: 8,
+          right: 8,
+          zIndex: 1,
+          color: "#5d6b7a",
+          bgcolor: "rgba(255,255,255,0.72)",
+          "&:hover": { bgcolor: "rgba(255,255,255,0.95)" },
+        }}
+      >
+        <CloseIcon fontSize="small" />
+      </IconButton>
+
+      <CardContent sx={{ p: { xs: 2, md: 2.25 } }}>
         <Box
           sx={{
             display: "flex",
-            alignItems: { xs: "flex-start", md: "center" },
+            alignItems: "flex-start",
             justifyContent: "space-between",
-            flexDirection: { xs: "column", md: "row" },
             gap: 1.5,
-            mb: 2.5,
+            mb: 1.75,
+            pr: 4,
           }}
         >
           <Box>
@@ -159,15 +204,14 @@ export default function CurrencyConverter() {
             >
               Canlı Piyasa
             </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 900, color: "#102235" }}>
-              Kur ve altın bilgileri
+            <Typography variant="subtitle1" sx={{ fontWeight: 900, color: "#102235" }}>
+              Döviz bilgileri
             </Typography>
           </Box>
 
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: "#5d6b7a" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, color: "#5d6b7a" }}>
             {loading ? <CircularProgress size={18} /> : <TrendingUpIcon fontSize="small" />}
-            <Typography variant="body2">
-              {updatedAt ? `Son güncelleme ${updatedAt}` : "Veriler yükleniyor"}
+            <Typography variant="caption">
             </Typography>
           </Box>
         </Box>
@@ -175,8 +219,8 @@ export default function CurrencyConverter() {
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: { xs: "1fr", sm: "repeat(3, minmax(0, 1fr))" },
-            gap: 1.5,
+            gridTemplateColumns: "1fr",
+            gap: 1,
           }}
         >
           {MARKET_ITEMS.map((item) => {
@@ -188,33 +232,50 @@ export default function CurrencyConverter() {
                 key={item.key}
                 elevation={0}
                 sx={{
-                  borderRadius: 2,
+                  borderRadius: 1.5,
                   border: "1px solid rgba(16, 34, 53, 0.1)",
                   boxShadow: "none",
                   bgcolor: "#f8fafc",
                 }}
               >
-                <CardContent sx={{ p: 2 }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, mb: 1.5 }}>
+                <CardContent
+                  sx={{
+                    p: 1.5,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 1.5,
+                    "&:last-child": { pb: 1.5 },
+                  }}
+                >
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, minWidth: 0 }}>
                     <Box
                       sx={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: 2,
+                        width: 34,
+                        height: 34,
+                        borderRadius: 1.5,
                         display: "grid",
                         placeItems: "center",
                         color: item.accent,
                         bgcolor: `${item.accent}18`,
+                        flexShrink: 0,
                       }}
                     >
-                      <Icon />
+                      <Icon fontSize="small" />
                     </Box>
                     <Typography sx={{ fontWeight: 900, color: "#102235" }}>
                       {item.label}
                     </Typography>
                   </Box>
 
-                  <Typography variant="h5" sx={{ fontWeight: 900, color: "#102235" }}>
+                  <Typography
+                    sx={{
+                      fontWeight: 900,
+                      color: "#102235",
+                      fontSize: "1rem",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
                     {loading
                       ? "..."
                       : Number.isFinite(value)
@@ -228,9 +289,8 @@ export default function CurrencyConverter() {
         </Box>
 
         {error && (
-          <Alert severity="info" sx={{ mt: 2, borderRadius: 2 }}>
-            Ana piyasa kaynağına ulaşılamazsa USD ve EUR yedek kaynaktan alınır;
-            altın verisi kaynak erişimine bağlıdır.
+          <Alert severity="info" sx={{ mt: 1.5, borderRadius: 1.5 }}>
+            Ana piyasa kaynağına ulaşılamazsa kurlar yedek kaynaktan alınır.
           </Alert>
         )}
       </CardContent>

@@ -18,11 +18,10 @@ import PolicyIcon from "@mui/icons-material/Policy";
 import SupportAgentIcon from "@mui/icons-material/SupportAgent";
 import SpeedIcon from "@mui/icons-material/Speed";
 import SecurityIcon from "@mui/icons-material/Security";
-import CurrencyConverter from "../components/CurrencyConverter";
 
 const kpiItems = [
   { value: "35000+", label: "TAMAMLANAN İŞLEM", icon: FactCheckIcon },
-  { value: "130+", label: "GÜMRÜKLEME YAPILAN ÜLKE", icon: LanguageIcon },
+  { value: "110+", label: "GÜMRÜKLEME YAPILAN ÜLKE", icon: LanguageIcon },
   { value: "35+", label: "TECRÜBE YILI", icon: HourglassTopIcon },
   { value: "%99", label: "MÜŞTERİ MEMNUNİYETİ", icon: VolunteerActivismIcon },
 ];
@@ -300,10 +299,6 @@ export default function Hakkimizda() {
 
       <Box sx={{ bgcolor: "#f5f7fa", pb: { xs: 7, md: 10 } }}>
         <Container maxWidth="lg">
-          <Box sx={{ mt: { xs: 3, md: 5 }, position: "relative", zIndex: 5 }}>
-            <CurrencyConverter />
-          </Box>
-
           <Grid container spacing={5} alignItems="stretch" sx={{ mt: { xs: 5, md: 7 } }}>
             <Grid item xs={12} md={5}>
               <Box
